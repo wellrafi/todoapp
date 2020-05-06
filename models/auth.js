@@ -21,7 +21,10 @@ module.exports = (sequelize, DataTypes) => {
     updatedAt: DataTypes.DATE,
   }, {});
   Auth.associate = function(models) {
-    models.hasMany(models.todo, {as: "todos"})
+    Auth.hasMany(models.todo, {
+      as: "todos", 
+      foreignKey: "userId"
+    })
   };
   return Auth;
 };

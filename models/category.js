@@ -11,7 +11,7 @@ module.exports = (sequelize, DataTypes) => {
     timestamps: false,
   });
   Category.associate = function(models) {
-    models.hasMany(models.Auth, {as: "user"})
+    Category.hasMany(models.Auth, {as: "user"})
   };
   return Category;
 };

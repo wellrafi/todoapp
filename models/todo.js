@@ -16,11 +16,13 @@ module.exports = (sequelize, DataTypes) => {
     updatedAt: DataTypes.DATE
   }, {});
   todo.associate = function(models) {
-    models.belongsTo(models.Auth, {
+    todo.belongsTo(models.Auth, {
       as: "user",
+      foreignKey: 'userId'
     });
-    models.belongsTo(models.Category, {
+    todo.belongsTo(models.Category, {
       as: "category",
+      foreignKey: 'categoryId'
     });
   };
   return todo;
