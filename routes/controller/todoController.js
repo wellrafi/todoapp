@@ -12,11 +12,10 @@ let fs = require('fs'),
 
 route.get('/', function(req, res) {
 	
-
 	if (req.query.q) {
 
 		var q = req.query.q
-		search(q)
+		search(res, q)
 
 		return
 	}
@@ -40,7 +39,19 @@ route.get('/', function(req, res) {
 
 });
 
-route.post('/', upload.array('thumbnail', 10), function(req, res) {
+route.post('/', upload.array('thumbnail'), function(req, res) {
+
+	let body = req.body.lenght > 0 ? req.body : [req.body];
+
+	let validate = new Validator(body, {
+		"*.do": "required"
+	});
+
+	validate.check().then(result => {
+		if (!result) {
+			return response(res, 422, validate.errors)
+		}
+	});
 
 	let thumbnail = []
 	req.files.forEach(valFile => {
@@ -53,18 +64,6 @@ route.post('/', upload.array('thumbnail', 10), function(req, res) {
 					.write(valFile.path)
 			})
 	})
-
-	let body = req.body.lenght > 0 ? req.body : [req.body];
-
-	let validate = new Validator(body, {
-		"*.do": "required"
-	});
-	
-	validate.check().then(result => {
-		if (!result) {
-			return response(res, 422, validate.errors)
-		}
-	});
 
 	let bodyInsert = body.map((valBody, index) => {
 		return {
@@ -103,24 +102,45 @@ route.put('/:todoId', upload.single('thumbnail'), function (req, res) {
 		.check()
 		.then( valValidate => {
 			if (!valValidate) {
-				return response(res, 422, {errors: valValidate.errors})
+				return response(res, 422, {error: validate.errors})
 			}
 		});
 
 	let { todoId } = req.params;
 	let { 
 		desc,
-		thumbnail,
 		accepted,
 		categoryId,
 	} = req.body;
 
-	let filename = thumbnail
+	let filename = null;
+
 	if (req.file) {
-		
-		let path = path.join(__dirname + './../public/images/'),
-			deletePath = (thumbnail !== null) ? thumbnail.split() : "";
-		fs.unlinkSync(filePath)
+
+		models
+			.todo
+			.findAll({
+				where: {
+					id: todoId
+				},
+				attributes: {
+					include: ['thumbnail']
+				}
+			})
+			.then(valResult => {
+
+				let val = valResult[0].get({plain: true}),
+					thumbnail = val.thumbnail,
+					oldPath = path.join(__dirname + './../../public/images/'),
+					fileName = (thumbnail !== null) ? thumbnail.split("/images/")[1] : null,
+					deletePath = filename !== null ? oldPath + fileName : null;
+
+				if (deletePath !== null) {
+					fs.unlinkSync(deletePath);
+				}
+
+			})
+
 		jimp
 		.read(req.file.path)
 		.then(valImage => {
@@ -128,18 +148,18 @@ route.put('/:todoId', upload.single('thumbnail'), function (req, res) {
 				.quality(90)
 				.cover(300, 200)
 				.write(req.file.path)
-		})
-		filename = process.env.DOMAIN + 'images/' + req.file.filename
-	}
+		});
 
-	
+		filename = process.env.DOMAIN + 'images/' + req.file.filename;
+
+	}
 
 	models
 		.todo
 		.update({
 				desc: desc,
 				do: req.body.do,
-				thumbnail:  filename,
+				thumbnail: filename,
 				accepted: accepted,
 				categoryId: categoryId,
 				updatedAt: Date() 
@@ -180,22 +200,23 @@ route.delete('/:todoId', function (req, res) {
 	})
 })
 
-function search(q) {
-
-	let objects = Object.keys(q);
-	let clause = objects.map(val => {
-		let ob = {};
-		ob[val] = { [Op.like] : q[val] + "%" };
-		return ob;
-	})
+function search(res, q) {
 
 	models.todo.findAll({
 		where: {
 			deleted: 0,
-			...clause
+			do: {
+				[Op.like]: "%" + q + "%"
+			}
+		},
+		order: [
+			['createdAt', "DESC"]
+		],
+		attributes: {
+			exclude: ['userId', 'categoryId', 'deleted', 'updatedAt']
 		}
 	}).then(result => {
-		console.log(result)
+		return response(res, 200, {data: result})
 	})
 }
 
